@@ -1,0 +1,16 @@
+x1/DataExchange-DatasetJson/CBER-POC-Pilot-Study1-Vaccine/send/dsjc 24 765907
+x1/DataExchange-DatasetJson/CBER-POC-Pilot-Study1-Vaccine/send/json 24 1105463
+x1/DataExchange-DatasetJson/CBER-POC-Pilot-Study1-Vaccine/send/ndjson 24 1140111
+x1/DataExchange-DatasetJson/CBER-POC-Pilot-Study1-Vaccine/send/xpt 24 1125655
+x1/DataExchange-DatasetJson/cdiscpilot01/adam/dsjc 18 7022458
+x1/DataExchange-DatasetJson/cdiscpilot01/adam/json 18 74468276
+x1/DataExchange-DatasetJson/cdiscpilot01/adam/ndjson 18 83413143
+x1/DataExchange-DatasetJson/cdiscpilot01/adam/xpt 18 91166110
+x1/DataExchange-DatasetJson/cdiscpilot01/sdtm/dsjc 34 9738714
+x1/DataExchange-DatasetJson/cdiscpilot01/sdtm/json 34 12154127
+x1/DataExchange-DatasetJson/cdiscpilot01/sdtm/ndjson 34 12442824
+x1/DataExchange-DatasetJson/cdiscpilot01/sdtm/xpt 34 21903540
+x1/DataExchange-DatasetJson/i18n/sdtm/json 1 428679
+x1/phuse-scripts/CBER-POC-Pilot-Study1-Vaccine/send/xpt 26 2897247
+x1/phuse-scripts/TDF-cdiscpilot01/adam/xpt 18 95760724
+x1/phuse-scripts/TDF-cdiscpilot01/sdtm/xpt 35 64331461

@@ -1,0 +1,5 @@
+# The data packages are stored byte for byte: their SHA256SUMS must match on
+# every platform, so Git never converts line endings in them (core.autocrlf).
+x*/** -text
+# Scripts: bash needs LF; PowerShell reads either.
+*.sh text eol=lf
