@@ -19,22 +19,30 @@ large sizes that do not fit in a Git repository.
 | `<source>` | the repository the data was published in |
 | `<study>` | the study |
 | `<standard>` | `adam`, `sdtm` or `send` |
-| `<format>` | `xpt` (SAS V5 transport), `json` (Dataset-JSON 1.1), `ndjson` (Dataset-JSON NDJSON), `dsjc` (compressed Dataset-JSON) |
+| `<format>` | one file per dataset: `xpt` (SAS V5 transport), `sas7bdat` (SAS dataset), `json` (Dataset-JSON 1.1), `ndjson` (Dataset-JSON NDJSON), `dsjc` (compressed Dataset-JSON), `rds` (R), `xlsx` (Excel) — or all datasets in one file: `xpt-lib`, `xlsx-lib`, `rda` |
 
 Each format folder holds the datasets, a `define.xml` describing them, the
 documents the define links to, and a `SHA256SUMS`. Open the `define.xml` to get
-the whole study.
+the whole study. In the library formats (`xpt-lib`, `xlsx-lib`, `rda`) all
+datasets are members of one file `<standard>.<ext>` (`sdtm.xpt`, `adam.xlsx`,
+`send.rda`), and the define points at each one as `<file>#<MEMBER>`, e.g.
+`sdtm.xpt#DM` — the member name as the file holds it (R object names are
+case-sensitive).
 
 ### Studies in `x1`
 
 | source | study | standards | formats |
 |---|---|---|---|
-| `DataExchange-DatasetJson` | `cdiscpilot01` | `adam`, `sdtm` | `xpt`, `json`, `ndjson`, `dsjc` |
-| `DataExchange-DatasetJson` | `CBER-POC-Pilot-Study1-Vaccine` | `send` | `xpt`, `json`, `ndjson`, `dsjc` |
+| `DataExchange-DatasetJson` | `cdiscpilot01` | `adam`, `sdtm` | all (upstream: `xpt`, `json`, `ndjson`, `dsjc`) |
+| `DataExchange-DatasetJson` | `CBER-POC-Pilot-Study1-Vaccine` | `send` | all (upstream: `xpt`, `json`, `ndjson`, `dsjc`) |
 | `DataExchange-DatasetJson` | `i18n` | `sdtm` | `json` (one dataset with Japanese characters) |
-| `phuse-scripts` | `TDF-cdiscpilot01` | `adam`, `sdtm` | `xpt` |
-| `phuse-scripts` | `CBER-POC-Pilot-Study1-Vaccine` | `send` | `xpt` |
-| `phuse-scripts` | `cdiscpilot-update1` | `adam` | `xpt` (`x1` only) |
+| `phuse-scripts` | `TDF-cdiscpilot01` | `adam`, `sdtm` | `xpt` (upstream) + the converted ones |
+| `phuse-scripts` | `CBER-POC-Pilot-Study1-Vaccine` | `send` | `xpt` (upstream) + the converted ones |
+| `phuse-scripts` | `cdiscpilot-update1` | `adam` | `xpt` (upstream) + the converted ones |
+
+"All" / "the converted ones" = `sas7bdat`, `rds`, `xlsx`, `xpt-lib`, `xlsx-lib`, `rda`,
+converted from the upstream XPT by the cumba data browser's export: values
+identical (checked with ReadStat and pyreadr), SAS lengths as declared.
 
 ### Scaled sizes
 
@@ -51,10 +59,10 @@ per dataset:
 
 | package (`<source>/<study>/<standard>`) | sizes | formats |
 |---|---|---|
-| `DataExchange-DatasetJson/cdiscpilot01/adam` | `x5`, `x50`, `x500` | `xpt`, `json`, `ndjson`, `dsjc` |
-| `DataExchange-DatasetJson/cdiscpilot01/sdtm` | `x10`, `x100`, `x1000` | `xpt`, `json`, `ndjson`, `dsjc` |
-| `DataExchange-DatasetJson/CBER-POC-Pilot-Study1-Vaccine/send` | `x200`, `x1000`, `x5000` | `xpt`, `json`, `ndjson`, `dsjc` |
-| `phuse-scripts/TDF-cdiscpilot01/sdtm` | `x5`, `x20`, `x200` | `xpt` |
+| `DataExchange-DatasetJson/cdiscpilot01/adam` | `x5`, `x50`, `x500` | `xpt`, `sas7bdat`, `json`, `ndjson`, `dsjc`, `rds` |
+| `DataExchange-DatasetJson/cdiscpilot01/sdtm` | `x10`, `x100`, `x1000` | `xpt`, `sas7bdat`, `json`, `ndjson`, `dsjc`, `rds` |
+| `DataExchange-DatasetJson/CBER-POC-Pilot-Study1-Vaccine/send` | `x200`, `x1000`, `x5000` | `xpt`, `sas7bdat`, `json`, `ndjson`, `dsjc`, `rds` |
+| `phuse-scripts/TDF-cdiscpilot01/sdtm` | `x5`, `x20`, `x200` | `xpt`, `sas7bdat`, `rds` |
 
 This repository holds `x1` and the first scaled size of each study (every file
 below 100 MB). The larger sizes are on <https://files.cumba.net/cdisc-test-data/>
@@ -113,6 +121,10 @@ fly, or download the `.gz` and decompress it locally.
   `TDF_ADaM_v1.0` has them 10 years later; `adcibc.AWHI` is filled. Three
   document links of its define point into the original submission package and
   do not resolve. It is provided as published, in `x1` only.
+- `phuse-scripts` TDF SDTM `ts.xpt` holds the windows-1252 character `’` (byte
+  `0x92`) in TSVAL; every other upstream XPT is plain ASCII. The XPT sources are
+  therefore read as windows-1252 for the conversions, and the library XPT and the
+  SAS7BDAT files are written in windows-1252 too.
 - Validation reports of the upstream repositories are not included.
 
 The example data is for illustration and testing only and may not conform to
