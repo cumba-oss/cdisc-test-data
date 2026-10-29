@@ -34,6 +34,7 @@ the whole study.
 | `DataExchange-DatasetJson` | `i18n` | `sdtm` | `json` (one dataset with Japanese characters) |
 | `phuse-scripts` | `TDF-cdiscpilot01` | `adam`, `sdtm` | `xpt` |
 | `phuse-scripts` | `CBER-POC-Pilot-Study1-Vaccine` | `send` | `xpt` |
+| `phuse-scripts` | `cdiscpilot-update1` | `adam` | `xpt` (`x1` only) |
 
 ### Scaled sizes
 
@@ -92,6 +93,12 @@ fly, or download the `.gz` and decompress it locally.
 - The `phuse-scripts` TDF data (`TDF_ADaM_v1.0`, `TDF_SDTM_v1.0`) was created by
   the PhUSE Test Data Factory project, which modified datasets of the CDISC
   SDTM/ADaM pilot study (CDISCPILOT01); it is published by PhUSE under MIT.
+- `cdiscpilot-update1` is PhUSE's `data/adam/cdiscpilot_update1.zip`, an earlier
+  state of `TDF_ADaM_v1.0`: in `adlbc`, `adlbcpv`, `adlbh` and `adlbhpv` its
+  `TRTSDT`, `TRTEDT` and `ADT` agree with ADSL and SDTM (2012–2015), where
+  `TDF_ADaM_v1.0` has them 10 years later; `adcibc.AWHI` is filled. Three
+  document links of its define point into the original submission package and
+  do not resolve. It is provided as published, in `x1` only.
 - Validation reports of the upstream repositories are not included.
 
 The example data is for illustration and testing only and may not conform to

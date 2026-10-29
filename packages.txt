@@ -14,3 +14,4 @@ x1/DataExchange-DatasetJson/i18n/sdtm/json 1 428679
 x1/phuse-scripts/CBER-POC-Pilot-Study1-Vaccine/send/xpt 26 2897247
 x1/phuse-scripts/TDF-cdiscpilot01/adam/xpt 18 95760724
 x1/phuse-scripts/TDF-cdiscpilot01/sdtm/xpt 35 64331461
+x1/phuse-scripts/cdiscpilot-update1/adam/xpt 16 89634016
