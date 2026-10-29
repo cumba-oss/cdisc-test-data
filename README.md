@@ -38,9 +38,23 @@ the whole study.
 
 ### Scaled sizes
 
-A scaled study (`x10`, `x100`, …) keeps its datasets and copies every record
-*k* times; only the subject identifier gets the suffix `-k`. Sizes are chosen per
-study, up to about 10 GB per XPT file or 20 million records per dataset.
+A scaled study (`x5`, `x10`, …) keeps its datasets and copies every record of a
+subject-level dataset *k* times; only `USUBJID` changes: it gets a 4-digit copy
+number appended (`01-701-1015` → `01-701-10150001` … `01-701-10150500`). Trial
+design datasets (no `USUBJID`) are copied unchanged. The scaled files are written
+by the cumba data browser's own export, in the format of their `x1` source; each
+`define.xml` is the `x1` one with `Length` raised where the written length is
+larger (mainly `USUBJID`, 4 characters longer).
+
+Sizes are chosen per study, up to about 10 GB per XPT file or 20 million records
+per dataset:
+
+| package (`<source>/<study>/<standard>`) | sizes | formats |
+|---|---|---|
+| `DataExchange-DatasetJson/cdiscpilot01/adam` | `x5`, `x50`, `x500` | `xpt`, `json`, `ndjson`, `dsjc` |
+| `DataExchange-DatasetJson/cdiscpilot01/sdtm` | `x10`, `x100`, `x1000` | `xpt`, `json`, `ndjson`, `dsjc` |
+| `DataExchange-DatasetJson/CBER-POC-Pilot-Study1-Vaccine/send` | `x200`, `x1000`, `x5000` | `xpt`, `json`, `ndjson`, `dsjc` |
+| `phuse-scripts/TDF-cdiscpilot01/sdtm` | `x5`, `x20`, `x200` | `xpt` |
 
 This repository holds `x1` and the first scaled size of each study (every file
 below 100 MB). The larger sizes are on <https://files.cumba.net/cdisc-test-data/>
