@@ -99,6 +99,8 @@ package carries a `SHA256SUMS`; the index of all packages is `packages.txt`.
 - Every file is transferred gzip-compressed (XPT files shrink up to ~30×),
   decompressed on arrival and checked against `SHA256SUMS`. Re-running the script
   skips files that are already correct, so an interrupted download just resumes.
+- Each file, each package and the whole run report what was transferred
+  (compressed), the full size, the ratio and the transfer speed.
 - `download.sh` needs bash, curl and `sha256sum` (or `shasum`); `download.ps1`
   runs on Windows PowerShell 5.1 and PowerShell 7.
 

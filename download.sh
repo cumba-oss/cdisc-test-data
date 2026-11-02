@@ -17,6 +17,8 @@
 # server keeps a compressed copy of every large text and XPT file), and checked
 # against the package's SHA256SUMS. A file already present with the right
 # checksum is not downloaded again, so an interrupted run can simply be repeated.
+# Each file, package and the whole run report the bytes transferred (compressed),
+# the full size, the ratio and the transfer speed.
 #
 # Needs: bash, curl, and sha256sum or shasum.
 set -euo pipefail
@@ -25,7 +27,7 @@ BASE_URL="${CDISC_TEST_DATA_URL:-https://files.cumba.net/cdisc-test-data}"
 SIZE="" SOURCE="" STUDY="" STANDARD="" FORMAT="" DEST="." LIST=0 YES=0
 
 usage() {
-  sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'
   cat <<EOF
 
 Options:
@@ -61,13 +63,22 @@ BASE_URL="${BASE_URL%/}"
 if command -v sha256sum >/dev/null 2>&1; then sha() { sha256sum < "$1" | cut -d' ' -f1; }
 else sha() { shasum -a 256 < "$1" | cut -d' ' -f1; }; fi
 
-fetch() {   # <url> <file>: gzip-compressed transfer, decompressed on arrival
-  curl --fail --silent --show-error --location --globoff --compressed --retry 3 -o "$2" "$1"
+fetch() {   # <url> <file>: gzip-compressed transfer, decompressed on arrival; prints "<bytes on the wire> <seconds>"
+  curl --fail --silent --show-error --location --globoff --compressed --retry 3 \
+    --write-out '%{size_download} %{time_total}\n' -o "$2" "$1"
 }
+# "<wire bytes> <full bytes> <seconds>" -> "0.6 MB -> 15.7 MB (25.9x), 8.4 MB/s"
+stats() {
+  awk -v w="$1" -v f="$2" -v t="$3" '
+    function h(b) { return b >= 1e9 ? sprintf("%.2f GB", b / 1e9) : b >= 1e6 ? sprintf("%.1f MB", b / 1e6) : sprintf("%.1f kB", b / 1e3) }
+    BEGIN { printf "%s -> %s (%.1fx), %s/s", h(w), h(f), (w > 0 ? f / w : 1), h((t > 0 ? w / t : 0)) }'
+}
+add() { awk -v a="$1" -v b="$2" 'BEGIN { printf "%.6f", a + b }'; }   # float sum (times)
+RUN_WIRE=0 RUN_FULL=0 RUN_TIME=0
 urlpath() { printf '%s' "$1" | sed -e 's/%/%25/g' -e 's/ /%20/g' -e 's/#/%23/g' -e 's/?/%3F/g'; }
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-fetch "$BASE_URL/packages.txt" "$TMP/packages.txt" \
+fetch "$BASE_URL/packages.txt" "$TMP/packages.txt" >/dev/null \
   || { echo "download: cannot read the package index $BASE_URL/packages.txt" >&2; exit 1; }
 
 # packages matching every given option (an empty option matches anything)
@@ -104,11 +115,12 @@ if [ "$n" -gt 1 ] && [ "$YES" -eq 0 ]; then
 fi
 
 download_pkg() {   # <package> <files> <bytes>: one package into $DEST/<package>; returns 1 if a file failed
-  local PKG="$1" FILES="$2" BYTES="$3" OUT got=0 kept=0 failed=0 want name f
+  local PKG="$1" FILES="$2" BYTES="$3" OUT got=0 kept=0 failed=0 want name f st wire secs full
+  local pw=0 pf=0 pt=0
   OUT="$DEST/$PKG"
   echo "package $PKG: $FILES files, $(awk -v b="$BYTES" 'BEGIN { printf "%.1f MB", b / 1e6 }')"
   mkdir -p "$OUT"
-  fetch "$BASE_URL/$(urlpath "$PKG")/SHA256SUMS" "$OUT/SHA256SUMS" \
+  fetch "$BASE_URL/$(urlpath "$PKG")/SHA256SUMS" "$OUT/SHA256SUMS" >/dev/null \
     || { echo "  FAILED SHA256SUMS" >&2; echo "done: package not downloaded -> $OUT"; return 1; }
   while read -r want name; do
     [ -n "$name" ] || continue
@@ -116,13 +128,18 @@ download_pkg() {   # <package> <files> <bytes>: one package into $DEST/<package>
     f="$OUT/$name"
     if [ -f "$f" ] && [ "$(sha "$f")" = "$want" ]; then kept=$((kept + 1)); continue; fi
     mkdir -p "$(dirname "$f")"
-    if fetch "$BASE_URL/$(urlpath "$PKG/$name")" "$f.part" && [ "$(sha "$f.part")" = "$want" ]; then
-      mv -f "$f.part" "$f"; got=$((got + 1)); echo "  $name"
+    if st="$(fetch "$BASE_URL/$(urlpath "$PKG/$name")" "$f.part")" && [ "$(sha "$f.part")" = "$want" ]; then
+      mv -f "$f.part" "$f"; got=$((got + 1))
+      read -r wire secs <<<"$st"; full=$(wc -c < "$f" | tr -d ' ')
+      pw=$((pw + wire)); pf=$((pf + full)); pt=$(add "$pt" "$secs")
+      echo "  $name  $(stats "$wire" "$full" "$secs")"
     else
       rm -f "$f.part"; failed=$((failed + 1)); echo "  FAILED $name" >&2
     fi
   done < "$OUT/SHA256SUMS"
+  RUN_WIRE=$((RUN_WIRE + pw)); RUN_FULL=$((RUN_FULL + pf)); RUN_TIME=$(add "$RUN_TIME" "$pt")
   echo "done: $got downloaded, $kept already present, $failed failed -> $OUT"
+  [ "$got" -eq 0 ] || echo "  transferred: $(stats "$pw" "$pf" "$pt") in $(awk -v t="$pt" 'BEGIN { printf "%.1f", t }') s"
   [ "$failed" -eq 0 ]
 }
 
@@ -130,5 +147,8 @@ bad=0
 while read -r PKG FILES BYTES; do
   download_pkg "$PKG" "$FILES" "$BYTES" || bad=$((bad + 1))
 done <<<"$matches"
-[ "$n" -eq 1 ] || echo "all done: $n packages ($total), $((n - bad)) complete, $bad with failures"
+if [ "$n" -gt 1 ]; then
+  echo "all done: $n packages ($total), $((n - bad)) complete, $bad with failures"
+  [ "$RUN_WIRE" -eq 0 ] || echo "  transferred: $(stats "$RUN_WIRE" "$RUN_FULL" "$RUN_TIME") in $(awk -v t="$RUN_TIME" 'BEGIN { printf "%.1f", t }') s"
+fi
 [ "$bad" -eq 0 ]

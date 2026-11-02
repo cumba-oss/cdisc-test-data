@@ -14,7 +14,9 @@ current directory), so a download completes a clone of this repository.
 Every file is requested gzip-compressed and decompressed on arrival (the server
 keeps a compressed copy of every large text and XPT file), and checked against
 the package's SHA256SUMS. A file already present with the right checksum is not
-downloaded again, so an interrupted run can simply be repeated.
+downloaded again, so an interrupted run can simply be repeated. Each file,
+package and the whole run report the bytes transferred (compressed), the full
+size, the ratio and the transfer speed.
 
 Runs on Windows PowerShell 5.1 and PowerShell 7.
 
@@ -47,34 +49,65 @@ $BaseUrl = $BaseUrl.TrimEnd('/')
 Add-Type -AssemblyName System.Net.Http
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 $handler = New-Object System.Net.Http.HttpClientHandler
-# gzip-compressed transfer, decompressed on arrival
-$handler.AutomaticDecompression = [System.Net.DecompressionMethods]::GZip
+# gzip-compressed transfer, decompressed here rather than by the handler: automatic decompression
+# hides how many bytes actually crossed the wire, which the statistics report
+$handler.AutomaticDecompression = [System.Net.DecompressionMethods]::None
 $client = New-Object System.Net.Http.HttpClient($handler)
+$client.DefaultRequestHeaders.AcceptEncoding.ParseAdd('gzip')
 $client.Timeout = [TimeSpan]::FromHours(6)
 
 function Get-UrlPath([string]$Path) {
     ($Path -split '/' | ForEach-Object { [Uri]::EscapeDataString($_) }) -join '/'
 }
 
+# <Url> -> <File>; returns @{ Wire = bytes on the wire; Seconds = transfer time }
 function Save-Url([string]$Url, [string]$File) {
+    $raw = "$File.raw"
     $attempt = 0
     while ($true) {
         $attempt++
         try {
+            $clock = [Diagnostics.Stopwatch]::StartNew()
             $response = $client.GetAsync($Url, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
             try {
                 if (-not $response.IsSuccessStatusCode) { throw "HTTP $([int]$response.StatusCode) for $Url" }
+                $gzip = $response.Content.Headers.ContentEncoding -contains 'gzip'
                 $in = $response.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
-                $out = [System.IO.File]::Create($File)
+                $out = [System.IO.File]::Create($raw)
                 try { $in.CopyTo($out, 1MB) } finally { $out.Dispose(); $in.Dispose() }
             } finally { $response.Dispose() }
-            return
+            $clock.Stop()
+            $wire = (Get-Item -LiteralPath $raw).Length
+            if ($gzip) {
+                $src = [System.IO.File]::OpenRead($raw)
+                try {
+                    $unzip = New-Object System.IO.Compression.GZipStream($src, [System.IO.Compression.CompressionMode]::Decompress)
+                    $dst = [System.IO.File]::Create($File)
+                    try { $unzip.CopyTo($dst, 1MB) } finally { $dst.Dispose(); $unzip.Dispose() }
+                } finally { $src.Dispose() }
+                Remove-Item -LiteralPath $raw
+            } else {
+                Move-Item -LiteralPath $raw -Destination $File -Force
+            }
+            return [pscustomobject]@{ Wire = $wire; Seconds = $clock.Elapsed.TotalSeconds }
         } catch {
+            Remove-Item -LiteralPath $raw -ErrorAction SilentlyContinue
             if ($attempt -ge 3) { throw }
             Start-Sleep -Seconds (2 * $attempt)
         }
     }
 }
+
+function Format-Size([double]$Bytes) {
+    if ($Bytes -ge 1e9) { '{0:N2} GB' -f ($Bytes / 1e9) } elseif ($Bytes -ge 1e6) { '{0:N1} MB' -f ($Bytes / 1e6) } else { '{0:N1} kB' -f ($Bytes / 1e3) }
+}
+# "0.6 MB -> 15.7 MB (25.9x), 8.4 MB/s"
+function Format-Stats([double]$Wire, [double]$Full, [double]$Seconds) {
+    $ratio = if ($Wire -gt 0) { $Full / $Wire } else { 1 }
+    $speed = if ($Seconds -gt 0) { $Wire / $Seconds } else { 0 }
+    '{0} -> {1} ({2:N1}x), {3}/s' -f (Format-Size $Wire), (Format-Size $Full), $ratio, (Format-Size $speed)
+}
+$script:runWire = 0L; $script:runFull = 0L; $script:runSeconds = 0.0
 
 function Get-Sha256([string]$File) {
     $sha = [System.Security.Cryptography.SHA256]::Create()
@@ -85,7 +118,7 @@ function Get-Sha256([string]$File) {
 
 $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("cdisc-test-data-" + [Guid]::NewGuid())
 try {
-    try { Save-Url "$BaseUrl/packages.txt" $tmp }
+    try { Save-Url "$BaseUrl/packages.txt" $tmp | Out-Null }
     catch { throw "cannot read the package index $BaseUrl/packages.txt ($($_.Exception.Message))" }
     $packages = Get-Content -LiteralPath $tmp | Where-Object { $_.Trim() } | ForEach-Object {
         $f = $_ -split '\s+'
@@ -137,10 +170,10 @@ function Save-Package($pkg) {
     'package {0}: {1} files, {2:N1} MB' -f $pkg.Path, $pkg.Files, ($pkg.Bytes / 1e6) | Write-Host
     New-Item -ItemType Directory -Force -Path $out | Out-Null
     $sums = Join-Path $out 'SHA256SUMS'
-    try { Save-Url "$BaseUrl/$(Get-UrlPath $pkg.Path)/SHA256SUMS" $sums }
+    try { Save-Url "$BaseUrl/$(Get-UrlPath $pkg.Path)/SHA256SUMS" $sums | Out-Null }
     catch { Write-Warning "FAILED SHA256SUMS ($($_.Exception.Message))"; Write-Host "done: package not downloaded -> $out"; return $false }
 
-    $got = 0; $kept = 0; $failed = 0
+    $got = 0; $kept = 0; $failed = 0; $pw = 0L; $pf = 0L; $pt = 0.0
     foreach ($line in Get-Content -LiteralPath $sums) {
         if ($line -notmatch '^([0-9a-f]{64})  (.+)$') { continue }
         $want = $Matches[1]; $name = $Matches[2]
@@ -150,16 +183,20 @@ function Save-Package($pkg) {
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $file) | Out-Null
         $part = "$file.part"
         try {
-            Save-Url "$BaseUrl/$(Get-UrlPath "$($pkg.Path)/$name")" $part
+            $st = Save-Url "$BaseUrl/$(Get-UrlPath "$($pkg.Path)/$name")" $part
             if ((Get-Sha256 $part) -ne $want) { throw 'checksum mismatch' }
             Move-Item -LiteralPath $part -Destination $file -Force
-            $got++; Write-Host "  $name"
+            $full = (Get-Item -LiteralPath $file).Length
+            $pw += $st.Wire; $pf += $full; $pt += $st.Seconds
+            $got++; Write-Host "  $name  $(Format-Stats $st.Wire $full $st.Seconds)"
         } catch {
             Remove-Item -LiteralPath $part -ErrorAction SilentlyContinue
             $failed++; Write-Warning "FAILED $name ($($_.Exception.Message))"
         }
     }
+    $script:runWire += $pw; $script:runFull += $pf; $script:runSeconds += $pt
     Write-Host "done: $got downloaded, $kept already present, $failed failed -> $out"
+    if ($got -gt 0) { Write-Host ('  transferred: {0} in {1:N1} s' -f (Format-Stats $pw $pf $pt), $pt) }
     return ($failed -eq 0)
 }
 
@@ -168,5 +205,6 @@ foreach ($pkg in $matching) { if (-not (Save-Package $pkg)) { $bad++ } }
 $client.Dispose()
 if ($matching.Count -gt 1) {
     "all done: $($matching.Count) packages ($total), $($matching.Count - $bad) complete, $bad with failures"
+    if ($script:runWire -gt 0) { '  transferred: {0} in {1:N1} s' -f (Format-Stats $script:runWire $script:runFull $script:runSeconds), $script:runSeconds }
 }
 if ($bad -gt 0) { exit 1 }
