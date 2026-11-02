@@ -60,7 +60,7 @@
       <!-- ************************************************************************** -->
 
   <def:Standards>
-      <def:Standard OID="STD.1" Name="STDTMIG" Type="IG" Version="3.3" Status="Final" def:CommentOID="COM.ST1"/>
+      <def:Standard OID="STD.1" Name="SDTMIG" Type="IG" Version="3.3" Status="Final" def:CommentOID="COM.ST1"/>
       <def:Standard OID="STD.2_1" Name="SDTMIG-MD" Type="IG" Version="1.1" Status="Final" def:CommentOID="COM.ST2"/>
       <def:Standard OID="STD.4" Name="CDISC/NCI" Type="CT" PublishingSet="DEFINE-XML" Version="2020-12-18" Status="Final" def:CommentOID="COM.ST4"/>
       <def:Standard OID="STD.3" Name="CDISC/NCI" Type="CT" PublishingSet="SDTM" Version="2020-12-18" Status="Final" def:CommentOID="COM.ST3"/>

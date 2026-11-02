@@ -118,10 +118,15 @@ fly, or download the `.gz` and decompress it locally.
 | `phuse-scripts` | [phuse-org/phuse-scripts](https://github.com/phuse-org/phuse-scripts), `data/` (commit `398a6d33`) | MIT |
 
 - The `x1` data files are byte-identical to upstream.
-- The `define.xml` in each `xpt` folder is the upstream file unchanged. The ones
+- The `define.xml` in each `xpt` folder is the upstream file, apart from the one
+  correction below. The ones
   in the `json`, `ndjson` and `dsjc` folders differ from it only in the dataset
   links (`xlink:href` and `def:title`), which name the folder's format instead of
   `.xpt`.
+- One correction to upstream: the `DataExchange-DatasetJson` `cdiscpilot01` SDTM
+  define names its implementation guide `STDTMIG`; it is `SDTMIG` here (the TS
+  domain's `SDTIGVER` is 3.3), in `define.xml` and the two rendered
+  `define_*.html` pages of every format.
 - The `phuse-scripts` TDF data (`TDF_ADaM_v1.0`, `TDF_SDTM_v1.0`) was created by
   the PhUSE Test Data Factory project, which modified datasets of the CDISC
   SDTM/ADaM pilot study (CDISCPILOT01); it is published by PhUSE under MIT.
