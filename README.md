@@ -68,7 +68,7 @@ This repository holds `x1` and the first scaled size of each study (every file
 below 100 MB). The larger sizes are on <https://files.cumba.net/cdisc-test-data/>
 only; download them with the scripts below.
 
-## Downloading a package
+## Downloading packages
 
 A **package** is one `<size>/<source>/<study>/<standard>/<format>/` folder. Each
 package carries a `SHA256SUMS`; the index of all packages is `packages.txt`.
@@ -76,15 +76,23 @@ package carries a `SHA256SUMS`; the index of all packages is `packages.txt`.
 ```bash
 ./download.sh --list --size x50                       # what is there
 ./download.sh --size x50 --source DataExchange-DatasetJson --standard adam --format xpt
+./download.sh --format xpt --standard sdtm            # every SDTM package in XPT (asks first)
+./download.sh --size x1 --format json -y              # every x1 JSON package, without asking
 ```
 
 ```powershell
 .\download.ps1 -List -Size x50
 .\download.ps1 -Size x50 -Source DataExchange-DatasetJson -Standard adam -Format xpt
+.\download.ps1 -Format xpt -Standard sdtm
+.\download.ps1 -Size x1 -Format json -Yes
 ```
 
-- `--study` / `-Study` is needed only when a source has several studies for the
-  same standard (the script lists them).
+- Every option selects, and one left out matches anything: the script downloads
+  **every** package that matches, so a partial selection (only a format, only a
+  size, …) downloads several. Check with `--list` / `-List` first.
+- When more than one package matches, the script lists them with their total size
+  and asks before downloading; `-y` / `--yes` (PowerShell `-Yes` or `-y`) answers
+  yes. Without a terminal to ask on (a CI job, a pipe) it refuses unless `-y` is given.
 - The files land in `<size>/<source>/<study>/<standard>/<format>/` below the
   current directory (`--dest` / `-Destination`), so run the script in a clone to
   complete it.

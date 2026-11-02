@@ -1,11 +1,13 @@
 <#
 .SYNOPSIS
-Downloads one package of cdisc-test-data from files.cumba.net.
+Downloads packages of cdisc-test-data from files.cumba.net.
 
 .DESCRIPTION
 A package is one <size>/<source>/<study>/<standard>/<format>/ folder: the
-datasets, their define.xml and the documents it links to. -Study may be left
-out when only one study matches. The files land in
+datasets, their define.xml and the documents it links to. Every parameter
+selects; one left out matches anything, and every matching package is
+downloaded. When more than one matches, the script names the count and total
+size and asks first (-Yes / -y answers yes). The files land in
 <Destination>/<size>/<source>/<study>/<standard>/<format>/ (default: the
 current directory), so a download completes a clone of this repository.
 
@@ -20,6 +22,11 @@ Runs on Windows PowerShell 5.1 and PowerShell 7.
 .\download.ps1 -Size x50 -Source DataExchange-DatasetJson -Standard adam -Format xpt
 
 .EXAMPLE
+.\download.ps1 -Format xpt -Standard sdtm -Yes
+
+Every SDTM package in XPT, without asking.
+
+.EXAMPLE
 .\download.ps1 -List -Size x50
 #>
 [CmdletBinding()]
@@ -31,7 +38,8 @@ param(
     [string]$Format = '',
     [string]$Destination = '.',
     [string]$BaseUrl = $(if ($env:CDISC_TEST_DATA_URL) { $env:CDISC_TEST_DATA_URL } else { 'https://files.cumba.net/cdisc-test-data' }),
-    [switch]$List
+    [switch]$List,
+    [Alias('y')][switch]$Yes
 )
 $ErrorActionPreference = 'Stop'
 $BaseUrl = $BaseUrl.TrimEnd('/')
@@ -100,48 +108,65 @@ if ($List) {
     exit 0
 }
 
-foreach ($name in 'Size', 'Source', 'Standard', 'Format') {
-    if (-not (Get-Variable -Name $name -ValueOnly)) { Write-Error "-$name is required (or use -List)"; exit 2 }
-}
 if ($matching.Count -eq 0) {
-    Write-Host 'no package matches; the packages of this source:'
-    $ofSource = @($packages | Where-Object { $_.Source -eq $Source })
-    if ($ofSource.Count -eq 0) { Write-Host "  (no package of source $Source; try -List)" }
-    $ofSource | ForEach-Object { "  $($_.Path)" }
+    if ($Source) {
+        Write-Host "no package matches; the packages of source ${Source}:"
+        $ofSource = @($packages | Where-Object { $_.Source -eq $Source })
+        if ($ofSource.Count -eq 0) { Write-Host '  (none; try -List)' }
+        $ofSource | ForEach-Object { "  $($_.Path)" }
+    } else { Write-Host 'no package matches (try -List)' }
     exit 1
 }
-if ($matching.Count -gt 1) {
-    Write-Host "$($matching.Count) packages match - choose one with -Study:"
-    $matching | ForEach-Object { "  $($_.Path)" }
-    exit 2
-}
-
-$pkg = $matching[0]
-$out = Join-Path $Destination $pkg.Path
-'package {0}: {1} files, {2:N1} MB' -f $pkg.Path, $pkg.Files, ($pkg.Bytes / 1e6)
-New-Item -ItemType Directory -Force -Path $out | Out-Null
-$sums = Join-Path $out 'SHA256SUMS'
-Save-Url "$BaseUrl/$(Get-UrlPath $pkg.Path)/SHA256SUMS" $sums
-
-$got = 0; $kept = 0; $failed = 0
-foreach ($line in Get-Content -LiteralPath $sums) {
-    if ($line -notmatch '^([0-9a-f]{64})  (.+)$') { continue }
-    $want = $Matches[1]; $name = $Matches[2]
-    if ($name.StartsWith('/') -or $name.Contains('..')) { Write-Warning "refusing path $name"; $failed++; continue }
-    $file = Join-Path $out $name
-    if ((Test-Path -LiteralPath $file -PathType Leaf) -and (Get-Sha256 $file) -eq $want) { $kept++; continue }
-    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $file) | Out-Null
-    $part = "$file.part"
-    try {
-        Save-Url "$BaseUrl/$(Get-UrlPath "$($pkg.Path)/$name")" $part
-        if ((Get-Sha256 $part) -ne $want) { throw 'checksum mismatch' }
-        Move-Item -LiteralPath $part -Destination $file -Force
-        $got++; "  $name"
-    } catch {
-        Remove-Item -LiteralPath $part -ErrorAction SilentlyContinue
-        $failed++; Write-Warning "FAILED $name ($($_.Exception.Message))"
+$totalFiles = ($matching | Measure-Object -Property Files -Sum).Sum
+$totalBytes = ($matching | Measure-Object -Property Bytes -Sum).Sum
+$total = '{0} files, {1:N1} MB' -f $totalFiles, ($totalBytes / 1e6)
+if ($matching.Count -gt 1 -and -not $Yes) {
+    $matching | ForEach-Object { '  {0,-78} {1,10:N1} MB' -f $_.Path, ($_.Bytes / 1e6) }
+    # without an interactive console (redirected input, a scheduled task) refuse rather than block
+    if ([Console]::IsInputRedirected -or -not [Environment]::UserInteractive) {
+        Write-Host "$($matching.Count) packages match ($total) - pass -Yes to download them all, or narrow the selection"
+        exit 2
     }
+    $answer = Read-Host "Download these $($matching.Count) packages ($total)? [y/N]"
+    if ($answer -notmatch '^(y|yes)$') { 'nothing downloaded'; exit 1 }
 }
+
+# one package into <Destination>/<package>; returns $true when every file arrived
+function Save-Package($pkg) {
+    $out = Join-Path $Destination $pkg.Path
+    'package {0}: {1} files, {2:N1} MB' -f $pkg.Path, $pkg.Files, ($pkg.Bytes / 1e6) | Write-Host
+    New-Item -ItemType Directory -Force -Path $out | Out-Null
+    $sums = Join-Path $out 'SHA256SUMS'
+    try { Save-Url "$BaseUrl/$(Get-UrlPath $pkg.Path)/SHA256SUMS" $sums }
+    catch { Write-Warning "FAILED SHA256SUMS ($($_.Exception.Message))"; Write-Host "done: package not downloaded -> $out"; return $false }
+
+    $got = 0; $kept = 0; $failed = 0
+    foreach ($line in Get-Content -LiteralPath $sums) {
+        if ($line -notmatch '^([0-9a-f]{64})  (.+)$') { continue }
+        $want = $Matches[1]; $name = $Matches[2]
+        if ($name.StartsWith('/') -or $name.Contains('..')) { Write-Warning "refusing path $name"; $failed++; continue }
+        $file = Join-Path $out $name
+        if ((Test-Path -LiteralPath $file -PathType Leaf) -and (Get-Sha256 $file) -eq $want) { $kept++; continue }
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $file) | Out-Null
+        $part = "$file.part"
+        try {
+            Save-Url "$BaseUrl/$(Get-UrlPath "$($pkg.Path)/$name")" $part
+            if ((Get-Sha256 $part) -ne $want) { throw 'checksum mismatch' }
+            Move-Item -LiteralPath $part -Destination $file -Force
+            $got++; Write-Host "  $name"
+        } catch {
+            Remove-Item -LiteralPath $part -ErrorAction SilentlyContinue
+            $failed++; Write-Warning "FAILED $name ($($_.Exception.Message))"
+        }
+    }
+    Write-Host "done: $got downloaded, $kept already present, $failed failed -> $out"
+    return ($failed -eq 0)
+}
+
+$bad = 0
+foreach ($pkg in $matching) { if (-not (Save-Package $pkg)) { $bad++ } }
 $client.Dispose()
-"done: $got downloaded, $kept already present, $failed failed -> $out"
-if ($failed -gt 0) { exit 1 }
+if ($matching.Count -gt 1) {
+    "all done: $($matching.Count) packages ($total), $($matching.Count - $bad) complete, $bad with failures"
+}
+if ($bad -gt 0) { exit 1 }
