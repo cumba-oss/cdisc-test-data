@@ -17,7 +17,7 @@
       <MetaDataVersion OID="MDV.TDF_SDTM.CDISC SDTM.3.2" Name="Study TDF_SDTM Data Definitions"
                        Description="Test datasets created by updating existing CDISCPILOT SDTM datasets"
                        def:DefineVersion="2.0.0"
-                       def:StandardName="CDISC SDTM"
+                       def:StandardName="SDTM-IG"
                        def:StandardVersion="3.2">
          <def:SupplementalDoc>
             <def:DocumentRef leafID="LF.blankcrf"/>

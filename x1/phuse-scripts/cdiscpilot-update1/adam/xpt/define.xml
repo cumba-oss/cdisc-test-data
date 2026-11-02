@@ -18,8 +18,8 @@
                        Name="Study CDISCPILOT_Updated Data Definitions"
                        Description="CDISCPILOT_Updated Data Definition"
                        def:DefineVersion="2.0.0"
-                       def:StandardName="CDISC ADaM"
-                       def:StandardVersion="2.1">
+                       def:StandardName="ADaM-IG"
+                       def:StandardVersion="1.1">
          <def:SupplementalDoc>
             <def:DocumentRef leafID="LF.Figure_14-1"/>
             <def:DocumentRef leafID="LF.SAP_SEC_10.1.1"/>

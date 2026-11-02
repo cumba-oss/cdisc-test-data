@@ -17,8 +17,8 @@
       <MetaDataVersion OID="MDV.TDF_ADaM.CDISC ADaM.2.1" Name="Study TDF_ADaM Data Definitions"
                        Description="Test datasets created by updating existing CDISCPILOT ADaM datasets"
                        def:DefineVersion="2.0.0"
-                       def:StandardName="CDISC ADaM"
-                       def:StandardVersion="2.1">
+                       def:StandardName="ADaM-IG"
+                       def:StandardVersion="1.1">
          <def:SupplementalDoc>
             <def:DocumentRef leafID="LF.Suppdoc"/>
             <def:DocumentRef leafID="LF.Table_14-1.01"/>

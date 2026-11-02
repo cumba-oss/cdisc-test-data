@@ -118,15 +118,23 @@ fly, or download the `.gz` and decompress it locally.
 | `phuse-scripts` | [phuse-org/phuse-scripts](https://github.com/phuse-org/phuse-scripts), `data/` (commit `398a6d33`) | MIT |
 
 - The `x1` data files are byte-identical to upstream.
-- The `define.xml` in each `xpt` folder is the upstream file, apart from the one
-  correction below. The ones
+- The `define.xml` in each `xpt` folder is the upstream file, apart from the
+  standard corrections below. The ones
   in the `json`, `ndjson` and `dsjc` folders differ from it only in the dataset
   links (`xlink:href` and `def:title`), which name the folder's format instead of
   `.xpt`.
-- One correction to upstream: the `DataExchange-DatasetJson` `cdiscpilot01` SDTM
-  define names its implementation guide `STDTMIG`; it is `SDTMIG` here (the TS
-  domain's `SDTIGVER` is 3.3), in `define.xml` and the two rendered
-  `define_*.html` pages of every format.
+- Corrections to upstream: the standard each define declares, which tools read to
+  choose what to check against.
+  - `DataExchange-DatasetJson` `cdiscpilot01` SDTM: the implementation guide is
+    named `STDTMIG`; it is `SDTMIG` 3.3 here (the TS domain's `SDTIGVER` is 3.3),
+    in `define.xml` and the two rendered `define_*.html` pages of every format.
+  - `phuse-scripts` (Define-XML 2.0): `def:StandardName` / `def:StandardVersion`
+    named the model instead of the implementation guide - `CDISC SDTM` 3.2 and
+    `CDISC ADaM` 2.1. They are the guides the packages document: `SDTM-IG` 3.2 for
+    `TDF-cdiscpilot01` SDTM (its ReadMe: "SDTMIG v3.2 Test Datasets") and
+    `ADaM-IG` 1.1 for `TDF-cdiscpilot01` ADaM (ReadMe: "ADaMIG v1.1 Test
+    Datasets") and `cdiscpilot-update1` (ADRG: "Updated for ADaMIG v1.1"). The
+    OIDs, which embed the old text, are identifiers and stay as published.
 - The `phuse-scripts` TDF data (`TDF_ADaM_v1.0`, `TDF_SDTM_v1.0`) was created by
   the PhUSE Test Data Factory project, which modified datasets of the CDISC
   SDTM/ADaM pilot study (CDISCPILOT01); it is published by PhUSE under MIT.
